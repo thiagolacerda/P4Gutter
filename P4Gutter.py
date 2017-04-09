@@ -5,42 +5,24 @@ import sublime
 import sublime_plugin
 
 # GLOBALS --------------------------------------------------------------------------------------------------------------------------
-P4_WORKSPACE = '.p4_workspace'
 P4 = {}
 P4_DIFF_HEADER = re.compile('^([0-9,]+)([cad])([0-9,]+)$')
 
 
 # UTILITIES ------------------------------------------------------------------------------------------------------------------------
-def path_is_root(path):
-    if not os.path.isdir(path):
-        return False
-    return os.path.realpath(path) == os.path.realpath(os.path.join(path, '..'))
-
-
-def shell_run(args, env=None):
+def shell_run(args, cwd, env=None):
     if not os.path.isfile(args[0]):
         return '', 'executable "' + args[0] + '" not found.'
+
     print(' '.join(args))
     print(env)
     startupinfo = None
-    if os.name == 'nt':
+    if sublime.platform() == "windows":
         startupinfo = subprocess.STARTUPINFO()
         startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-    process = subprocess.Popen(args, stdout=subprocess.PIPE, startupinfo=startupinfo, stderr=subprocess.PIPE, env=env)
+
+    process = subprocess.Popen(args, stdout=subprocess.PIPE, startupinfo=startupinfo, stderr=subprocess.PIPE, env=env, cwd=cwd)
     return process.stdout.read().decode(encoding='UTF-8'), process.stderr.read().decode(encoding='UTF-8')
-
-
-def p4_find_workspace(file_path):
-    parent, _ = os.path.split(file_path)
-    while 1:
-        test_path = os.path.join(parent, P4_WORKSPACE)
-        if os.path.isfile(test_path):
-            with open(test_path, 'r') as fin:
-                workspace = fin.read().replace('\r', '').replace('\n', '')
-            return workspace
-        if path_is_root(parent):
-            return None
-        parent, _ = os.path.split(parent)
 
 
 def st3_region_for_line(view, line_number):
@@ -70,11 +52,8 @@ class P4AnnotationCommand(sublime_plugin.WindowCommand):
         if not self.view:
             sublime.set_timeout(self.run, 1)
             return
-        workspace = p4_find_workspace(self.view.file_name()) or P4['workspace']
-        if not workspace:
-            return
 
-        annotation = self.annotate(workspace)
+        annotation = self.annotate()
         if not annotation:
             return
 
@@ -85,13 +64,11 @@ class P4AnnotationCommand(sublime_plugin.WindowCommand):
         anno_view.settings().set('p4_annotation', annotation)
         anno_view.run_command('p4_annotation_populate')
 
-    def annotate(self, workspace):
+    def annotate(self):
         if not P4['enabled']:
             return ''
         environment = os.environ
-        environment['P4PORT'] = P4['port']
-        environment['P4USER'] = P4['user']
-        environment['P4CLIENT'] = workspace
+        environment['PCONFIG'] = P4['config']
 
         annotation, change_lists = self.annotate_sub_1(environment)
         if not annotation:
@@ -104,7 +81,8 @@ class P4AnnotationCommand(sublime_plugin.WindowCommand):
         return annotation
 
     def annotate_sub_1(self, environment):
-        output, error = shell_run([P4['binary'], 'annotate', '-q', '-c', self.view.file_name()], environment)
+        folder_name, file_name = os.path.split(self.view.file_name())
+        output, error = shell_run([P4['binary'], 'annotate', '-q', '-c', file_name], folder_name, environment)
         if len(error) and not len(output):
             return None, None
         output = output.replace('\r', '')  # replace CRs
@@ -122,12 +100,13 @@ class P4AnnotationCommand(sublime_plugin.WindowCommand):
 
     def annotate_sub_2(self, environment, annotation, change_lists):
         # find CL owners
+        folder_name, _ = os.path.split(self.view.file_name())
         who_pattern = re.compile('^Change [0-9]+ by ([^@]+)@')
         max_len_number, max_len_name = 0, 0
         for cl_number in change_lists.keys():
             if len(cl_number) > max_len_number:
                 max_len_number = len(cl_number)
-            output, error = shell_run([P4['binary'], 'describe', '-s', cl_number], environment)
+            output, error = shell_run([P4['binary'], 'describe', '-s', cl_number], folder_name, environment)
             if len(error) and not len(output):
                 continue
             who_match = who_pattern.search(output)
@@ -160,10 +139,9 @@ class P4GutterDiffCommand(sublime_plugin.WindowCommand):
         if not self.view:
             sublime.set_timeout(self.run, 1)
             return
-        workspace = p4_find_workspace(self.view.file_name()) or P4['workspace']
-        if not workspace:
-            return
-        additions, deletions_above, deletions_below, modifications = self.run_diff(workspace)
+
+        folder_name, _ = os.path.split(self.view.file_name())
+        additions, deletions_above, deletions_below, modifications = self.run_diff(folder_name)
         self.view.add_regions('p4gutter_addition', additions, 'markup.inserted',
                               'Packages/P4Gutter/icons/addition.png', sublime.DRAW_NO_FILL | sublime.DRAW_NO_OUTLINE)
         self.view.add_regions('p4gutter_deletion_above', deletions_above, 'markup.deleted',
@@ -173,14 +151,14 @@ class P4GutterDiffCommand(sublime_plugin.WindowCommand):
         self.view.add_regions('p4gutter_modification', modifications, 'markup.changed',
                               'Packages/P4Gutter/icons/modification.png', sublime.DRAW_NO_FILL | sublime.DRAW_NO_OUTLINE)
 
-    def run_diff(self, workspace):
+    def run_diff(self, folder):
         if not P4['enabled']:
             return [], [], [], []
+
         environment = os.environ
-        environment['P4PORT'] = P4['port']
-        environment['P4USER'] = P4['user']
-        environment['P4CLIENT'] = workspace
-        out, err = shell_run([P4['binary'], 'diff', '-dl', self.view.file_name()], environment)
+        environment['P4CONFIG'] = P4['config']
+        folder_name, file_name = os.path.split(self.view.file_name())
+        out, err = shell_run([P4['binary'], 'diff', '-dl', file_name], folder_name, environment)
         if len(err) and not len(out):
             if P4['errorlog']:
                 print('P4Gutter Error: "{}".'.format(err[:-1]).replace('\r', '').replace('\n', ' > '))
@@ -216,10 +194,8 @@ class P4GutterDiffCommand(sublime_plugin.WindowCommand):
 
 # SETTINGS -------------------------------------------------------------------------------------------------------------------------
 def p4gutter_reload_settings():
-    P4['workspace'] = P4['settings'].get('workspace')
     P4['binary'] = P4['settings'].get('binary') or 'p4'
-    P4['user'] = P4['settings'].get('user')
-    P4['port'] = P4['settings'].get('port')
+    P4['config'] = P4['settings'].get('p4config')
     P4['errorlog'] = P4['settings'].get('errorlog')
     P4['enabled'] = P4['settings'].get('enabled')
 

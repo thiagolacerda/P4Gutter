@@ -3,18 +3,8 @@
     // Usually "/usr/bin/p4" for OSX.
     "binary": "/usr/bin/p4",
 
-    // Perforce user name.
-    // Should be the same as your "P4USER" environment variable, if set.
-    "user": "P4USER",
-
-    // Perforce server/port.
-    // Should be the same as your "P4PORT" environment variable, if set.
-    "port": "P4PORT",
-
-    // Perforce workspace.
-    // You should probably use a ".p4_workspace" file in your workspace root directory to set this.
-    // But you can set it globally here, if desired.
-    "workspace": "P4CLIENT",
+    // config file name that can contain perforce depot and workspace info
+    "p4config": ".p4config",
 
     // Enabled
     // Disable the entire plugin here (until a better timeout fix is implemented).
