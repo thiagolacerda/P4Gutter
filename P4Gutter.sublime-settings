@@ -1,7 +1,16 @@
 {
-    // Add path to your Perforce command line binary here.
-    // Usually "/usr/bin/p4" for OSX.
-    "binary": "/usr/bin/p4",
+    // In case p4 is not in your path add it here for each platform, otherwise leave it blank
+    "osx": {
+        "binary": ""
+    },
+
+    "windows": {
+        "binary": ""
+    },
+
+    "linux": {
+        "binary": ""
+    },
 
     // config file name that can contain perforce depot and workspace info
     "p4config": ".p4config",

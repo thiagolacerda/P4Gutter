@@ -194,7 +194,7 @@ class P4GutterDiffCommand(sublime_plugin.WindowCommand):
 
 # SETTINGS -------------------------------------------------------------------------------------------------------------------------
 def p4gutter_reload_settings():
-    P4['binary'] = P4['settings'].get('binary') or 'p4'
+    P4['binary'] = P4['settings'].get(sublime.platform()).get('binary') or 'p4'
     P4['config'] = P4['settings'].get('p4config')
     P4['errorlog'] = P4['settings'].get('errorlog')
     P4['enabled'] = P4['settings'].get('enabled')
