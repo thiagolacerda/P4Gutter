@@ -11,9 +11,6 @@ P4_DIFF_HEADER = re.compile('^([0-9,]+)([cad])([0-9,]+)$')
 
 # UTILITIES ------------------------------------------------------------------------------------------------------------------------
 def shell_run(args, cwd, env=None):
-    if not os.path.isfile(args[0]):
-        return '', 'executable "' + args[0] + '" not found.'
-
     print(' '.join(args))
     print(env)
     startupinfo = None
@@ -194,7 +191,8 @@ class P4GutterDiffCommand(sublime_plugin.WindowCommand):
 
 # SETTINGS -------------------------------------------------------------------------------------------------------------------------
 def p4gutter_reload_settings():
-    P4['binary'] = P4['settings'].get(sublime.platform()).get('binary') or 'p4'
+    binary = P4['settings'].get(sublime.platform()).get('binary')
+    P4['binary'] = 'p4' if binary is None or len(binary) == 0 else binary
     P4['config'] = P4['settings'].get('p4config')
     P4['errorlog'] = P4['settings'].get('errorlog')
     P4['enabled'] = P4['settings'].get('enabled')
