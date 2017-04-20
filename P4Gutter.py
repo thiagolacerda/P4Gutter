@@ -11,8 +11,6 @@ P4_DIFF_HEADER = re.compile('^([0-9,]+)([cad])([0-9,]+)$')
 
 # UTILITIES ------------------------------------------------------------------------------------------------------------------------
 def shell_run(args, cwd, env=None):
-    print(' '.join(args))
-    print(env)
     startupinfo = None
     if sublime.platform() == "windows":
         startupinfo = subprocess.STARTUPINFO()
@@ -44,7 +42,6 @@ class P4GutterEventListener(sublime_plugin.EventListener):
 # ANNOTATION -----------------------------------------------------------------------------------------------------------------------
 class P4AnnotationCommand(sublime_plugin.WindowCommand):
     def run(self):
-        print('P4Annotation')
         self.view = self.window.active_view()
         if not self.view:
             sublime.set_timeout(self.run, 1)
