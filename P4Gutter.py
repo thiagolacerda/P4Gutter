@@ -151,6 +151,7 @@ class P4GutterDiffCommand(sublime_plugin.WindowCommand):
 
         environment = os.environ
         environment['P4CONFIG'] = P4['config']
+        environment['P4DIFF'] = ''
         folder_name, file_name = os.path.split(self.view.file_name())
         out, err = shell_run([P4['binary'], 'diff', '-dl', file_name], folder_name, environment)
         if len(err) and not len(out):
